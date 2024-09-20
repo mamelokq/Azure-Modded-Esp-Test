@@ -3662,3 +3662,76 @@ local Window = library:CreateWindow("Azure Modded Esp Test - Mamelok", Vector2.n
 local VisualsTab = Window:CreateTab("Visuals")
 
 local VisualsSection = VisualsTab:CreateSector("Esp", "left")
+
+--Start of Esp Boxes
+-- Add Toggle for ESP Boxes
+local EspBoxesToggle = VisualsSection:AddToggle("Boxes", false, function(parameter)
+    EspBoxes = parameter
+end)
+
+-- Add Keybind functionality for the ESP toggle
+local EspBoxesKeybind = EspBoxesToggle:AddKeybind()
+
+
+-- End of Esp Boxes
+
+
+--Start of Esp Names
+-- Add Toggle for ESP Names
+local EspNamesToggle = VisualsSection:AddToggle("Names", false, function(parameter)
+    EspNames = parameter
+end)
+
+-- Add Keybind functionality for the ESP toggle
+local EspNamesKeybind = EspNamesToggle:AddKeybind()
+
+
+-- End of Esp Names
+
+--Start of Esp Health
+-- Add Toggle for ESP Health
+local EspHealthToggle = VisualsSection:AddToggle("Health", false, function(parameter)
+    EspHealth = parameter
+end)
+
+-- Add Keybind functionality for the ESP toggle
+local EspHealthKeybind = EspHealthToggle:AddKeybind()
+
+
+-- End of Esp Health
+
+--Start of Esp Tracers
+-- Add Toggle for ESP Tracers
+local EspTracersToggle = VisualsSection:AddToggle("Tracers", false, function(parameter)
+    EspTracers = parameter
+end)
+
+-- Add Keybind functionality for the ESP toggle
+local EspTracersKeybind = EspTracersToggle:AddKeybind()
+
+
+-- End of Esp Tracers
+
+-- Start Of Esp Distance
+-- Add Toggle for ESP Distance
+local EspDistanceToggle = VisualsSection:AddToggle("Distance", false, function(parameter)
+    EspDistance = parameter
+end)
+
+-- Add Keybind functionality for the ESP toggle
+local EspDistanceKeybind = EspDistanceToggle:AddKeybind()
+
+
+-- End of Esp Distance
+
+-- Start of Esp Skeletons
+-- Add Toggle for ESP Skeletons
+local EspSkeletonsToggle = VisualsSection:AddToggle("Skeletons", false, function(parameter)
+    EspSkeletons = parameter
+end)
+
+-- Add Keybind functionality for the ESP toggle
+local EspSkeletonsKeybind = EspSkeletonsToggle:AddKeybind()
+
+
+-- End of Esp Skeletons
