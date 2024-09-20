@@ -3672,6 +3672,96 @@ end)
 -- Add Keybind functionality for the ESP toggle
 local EspBoxesKeybind = EspBoxesToggle:AddKeybind()
 
+local lplr = game.Players.LocalPlayer 
+local camera = game:GetService("Workspace").CurrentCamera
+local worldToViewportPoint = camera.worldToViewportPoint
+
+local HeadOff = Vector3.new(0, 0.5, 0)
+local LegOff = Vector3.new(0, 3, 0)
+
+local function createBoxESP(v)
+    local BoxOutline = Drawing.new("Square")
+    BoxOutline.Visible = false
+    BoxOutline.Color = Color3.new(0, 0, 0)
+    BoxOutline.Thickness = 3
+    BoxOutline.Transparency = 1
+    BoxOutline.Filled = false
+
+    local Box = Drawing.new("Square")
+    Box.Visible = false
+    Box.Color = Color3.new(1, 1, 1)
+    Box.Thickness = 1
+    Box.Transparency = 1
+    Box.Filled = false
+
+    return BoxOutline, Box
+end
+
+local function updateBoxESP(BoxOutline, Box, character)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local head = character:FindFirstChild("Head")
+
+    if humanoidRootPart and head then
+        local rootPosition, onScreen = camera:worldToViewportPoint(humanoidRootPart.Position)
+        local headPosition = camera:worldToViewportPoint(head.Position + HeadOff)
+        local legPosition = camera:worldToViewportPoint(humanoidRootPart.Position - LegOff)
+
+        if onScreen then
+            local distanceFactor = 1000 / rootPosition.Z
+            local boxWidth = distanceFactor + 20  -- Base width adjustment
+
+            -- Adjust the width based on distance
+            if rootPosition.Z > 50 then  -- Change this threshold as needed
+                boxWidth = boxWidth * (50 / rootPosition.Z)
+            end
+
+            BoxOutline.Size = Vector2.new(boxWidth, headPosition.Y - legPosition.Y)
+            BoxOutline.Position = Vector2.new(rootPosition.X - BoxOutline.Size.X / 2, rootPosition.Y - BoxOutline.Size.Y / 2)
+            BoxOutline.Visible = true
+
+            Box.Size = Vector2.new(boxWidth, headPosition.Y - legPosition.Y)
+            Box.Position = Vector2.new(rootPosition.X - Box.Size.X / 2, rootPosition.Y - Box.Size.Y / 2)
+            Box.Visible = true
+
+            if character:FindFirstChild("Humanoid") and character.Humanoid.Health <= 0 then
+                BoxOutline.Visible = false
+                Box.Visible = false
+            end
+        else
+            BoxOutline.Visible = false
+            Box.Visible = false
+        end
+    else
+        BoxOutline.Visible = false
+        Box.Visible = false
+    end
+end
+
+for _, player in pairs(game.Players:GetPlayers()) do
+    if player ~= lplr then
+        local BoxOutline, Box = createBoxESP(player)
+        game:GetService("RunService").RenderStepped:Connect(function()
+            if player.Character then
+                updateBoxESP(BoxOutline, Box, player.Character)
+            else
+                BoxOutline.Visible = false
+                Box.Visible = false
+            end
+        end)
+    end
+end
+
+game.Players.PlayerAdded:Connect(function(player)
+    local BoxOutline, Box = createBoxESP(player)
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if player.Character then
+            updateBoxESP(BoxOutline, Box, player.Character)
+        else
+            BoxOutline.Visible = false
+            Box.Visible = false
+        end
+    end)
+end)
 
 -- End of Esp Boxes
 
@@ -3685,6 +3775,80 @@ end)
 -- Add Keybind functionality for the ESP toggle
 local EspNamesKeybind = EspNamesToggle:AddKeybind()
 
+-- Settings
+local EspNames = true  -- Toggle for ESP
+
+-- Function to handle ESP Names
+local function espNames(player, character)
+    local humanoid = character:WaitForChild("Humanoid")
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    local textLabel = Drawing.new("Text")
+    textLabel.Visible = false
+    textLabel.Center = true
+    textLabel.Outline = true
+    textLabel.Font = 2
+    textLabel.Color = Color3.fromRGB(255, 255, 255)
+    textLabel.Size = 13
+
+    local connections = {}
+
+    local function cleanup()
+        textLabel.Visible = false
+        textLabel:Remove()
+        for _, connection in ipairs(connections) do
+            connection:Disconnect()
+        end
+        connections = {}
+    end
+
+    table.insert(connections, character.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            cleanup()
+        end
+    end))
+
+    table.insert(connections, humanoid.HealthChanged:Connect(function(health)
+        if health <= 0 or humanoid:GetState() == Enum.HumanoidStateType.Dead then
+            cleanup()
+        end
+    end))
+
+    table.insert(connections, game:GetService("RunService").RenderStepped:Connect(function()
+        if EspNames then
+            local hrpPosition, onScreen = workspace.CurrentCamera:WorldToViewportPoint(humanoidRootPart.Position)
+            if onScreen then
+                textLabel.Position = Vector2.new(hrpPosition.X, hrpPosition.Y)
+                textLabel.Text = player.Name
+                textLabel.Visible = true
+            else
+                textLabel.Visible = false
+            end
+        else
+            textLabel.Visible = false
+        end
+    end))
+end
+
+local function playerAdded(player)
+    player.CharacterAdded:Connect(function(character)
+        espNames(player, character)
+    end)
+    
+    if player.Character then
+        espNames(player, player.Character)
+    end
+end
+
+-- Connect to existing players
+for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+    if player ~= game:GetService("Players").LocalPlayer then
+        playerAdded(player)
+    end
+end
+
+-- Connect to new players
+game:GetService("Players").PlayerAdded:Connect(playerAdded)
 
 -- End of Esp Names
 
@@ -3697,6 +3861,121 @@ end)
 -- Add Keybind functionality for the ESP toggle
 local EspHealthKeybind = EspHealthToggle:AddKeybind()
 
+local lplr = game.Players.LocalPlayer
+local camera = game:GetService("Workspace").CurrentCamera
+local worldToViewportPoint = camera.worldToViewportPoint
+
+_G.TeamCheck = false -- Toggle TeamCheck to True or False
+local EspHealth = true -- Track if ESP Health is enabled
+
+local HeadOff = Vector3.new(0, 0.5, 0)
+local LegOff = Vector3.new(0, 3, 0)
+
+-- Function to create ESP elements
+local function CreateESPElements()
+    local BoxOutline = Drawing.new("Square")
+    BoxOutline.Color = Color3.new(0, 0, 0)
+    BoxOutline.Thickness = 3
+    BoxOutline.Transparency = 1
+    BoxOutline.Filled = false
+    BoxOutline.Visible = false
+
+    local Box = Drawing.new("Square")
+    Box.Color = Color3.new(1, 1, 1)
+    Box.Thickness = 1
+    Box.Transparency = 1
+    Box.Filled = false
+    Box.Visible = false
+
+    local HealthBarOutline = Drawing.new("Square")
+    HealthBarOutline.Thickness = 3
+    HealthBarOutline.Filled = false
+    HealthBarOutline.Color = Color3.new(0, 0, 0)
+    HealthBarOutline.Transparency = 1
+    HealthBarOutline.Visible = false
+
+    local HealthBar = Drawing.new("Square")
+    HealthBar.Thickness = 1
+    HealthBar.Filled = false
+    HealthBar.Transparency = 1
+    HealthBar.Visible = false
+
+    return BoxOutline, Box, HealthBarOutline, HealthBar
+end
+
+-- Function to update ESP elements
+local function UpdateESP(v, BoxOutline, Box, HealthBarOutline, HealthBar)
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if EspHealth and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character:FindFirstChild("HumanoidRootPart") and v ~= lplr and v.Character.Humanoid.Health > 0 then
+            local Vector, onScreen = camera:worldToViewportPoint(v.Character.HumanoidRootPart.Position)
+
+            local RootPart = v.Character.HumanoidRootPart
+            local Head = v.Character.Head
+            local RootPosition = worldToViewportPoint(camera, RootPart.Position)
+            local HeadPosition = worldToViewportPoint(camera, Head.Position + HeadOff)
+            local LegPosition = worldToViewportPoint(camera, RootPart.Position - LegOff)
+
+            if onScreen then
+                BoxOutline.Size = Vector2.new(1000 / RootPosition.Z, HeadPosition.Y - LegPosition.Y)
+                BoxOutline.Position = Vector2.new(RootPosition.X - BoxOutline.Size.X / 2, RootPosition.Y - BoxOutline.Size.Y / 2)
+                BoxOutline.Visible = true
+
+                Box.Size = Vector2.new(1000 / RootPosition.Z, HeadPosition.Y - LegPosition.Y)
+                Box.Position = Vector2.new(RootPosition.X - Box.Size.X / 2, RootPosition.Y - Box.Size.Y / 2)
+                Box.Visible = true
+
+                HealthBarOutline.Size = Vector2.new(2, HeadPosition.Y - LegPosition.Y)
+                HealthBarOutline.Position = BoxOutline.Position - Vector2.new(6, 0)
+                HealthBarOutline.Visible = true
+
+                local maxHealth = v.Character:FindFirstChild("Humanoid").MaxHealth
+                local health = v.Character:FindFirstChild("Humanoid").Health
+                HealthBar.Size = Vector2.new(2, (HeadPosition.Y - LegPosition.Y) * (health / maxHealth))
+                HealthBar.Position = Vector2.new(Box.Position.X - 6, Box.Position.Y + (1 / HealthBar.Size.Y))
+                HealthBar.Color = Color3.fromRGB(255 - 255 * (health / maxHealth), 255 * (health / maxHealth), 0)
+                HealthBar.Visible = true
+
+                if v.TeamColor == lplr.TeamColor and _G.TeamCheck then
+                    BoxOutline.Visible = false
+                    Box.Visible = false
+                    HealthBarOutline.Visible = false
+                    HealthBar.Visible = false
+                else
+                    BoxOutline.Visible = true
+                    Box.Visible = true
+                    HealthBarOutline.Visible = true
+                    HealthBar.Visible = true
+                end
+            else
+                BoxOutline.Visible = false
+                Box.Visible = false
+                HealthBarOutline.Visible = false
+                HealthBar.Visible = false
+            end
+        else
+            BoxOutline.Visible = false
+            Box.Visible = false
+            HealthBarOutline.Visible = false
+            HealthBar.Visible = false
+        end
+    end)
+end
+
+-- Create ESP elements for existing players
+for _, v in pairs(game.Players:GetPlayers()) do
+    if v ~= lplr then
+        local BoxOutline, Box, HealthBarOutline, HealthBar = CreateESPElements()
+        coroutine.wrap(function() UpdateESP(v, BoxOutline, Box, HealthBarOutline, HealthBar) end)()
+    end
+end
+
+-- Handle new players
+game.Players.PlayerAdded:Connect(function(v)
+    if v ~= lplr then
+        local BoxOutline, Box, HealthBarOutline, HealthBar = CreateESPElements()
+        coroutine.wrap(function() UpdateESP(v, BoxOutline, Box, HealthBarOutline, HealthBar) end)()
+    end
+end)
 
 -- End of Esp Health
 
@@ -3709,6 +3988,58 @@ end)
 -- Add Keybind functionality for the ESP toggle
 local EspTracersKeybind = EspTracersToggle:AddKeybind()
 
+local lplr = game.Players.LocalPlayer
+local camera = game:GetService("Workspace").CurrentCamera
+local worldToViewportPoint = camera.worldToViewportPoint
+
+_G.TeamCheck = false -- Toggle TeamCheck to True or False
+
+local function createTracerForPlayer(player)
+    local Tracer = Drawing.new("Line")
+    Tracer.Visible = false
+    Tracer.Color = Color3.new(1, 1, 1) -- Tracer color
+    Tracer.Thickness = 1
+    Tracer.Transparency = 1
+
+    local function updateTracer()
+        game:GetService("RunService").RenderStepped:Connect(function()
+            if player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart") and player ~= lplr and player.Character.Humanoid.Health > 0 then
+                local Vector, OnScreen = camera:worldToViewportPoint(player.Character.HumanoidRootPart.Position)
+
+                if OnScreen then
+                    Tracer.From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y) -- From center of screen
+                    Tracer.To = Vector2.new(Vector.X, Vector.Y)
+
+                    if _G.TeamCheck and player.TeamColor == lplr.TeamColor then
+                        Tracer.Visible = false -- Hide tracer for teammates
+                    else
+                        Tracer.Visible = true -- Show tracer for enemies
+                    end
+                else
+                    Tracer.Visible = false -- Hide if not on screen
+                end
+            else
+                Tracer.Visible = false -- Hide if player is dead or not valid
+            end
+        end)
+    end
+
+    coroutine.wrap(updateTracer)() -- Start the tracer update coroutine
+end
+
+-- Create tracers for existing players
+for _, player in pairs(game.Players:GetPlayers()) do
+    if player ~= lplr then
+        createTracerForPlayer(player)
+    end
+end
+
+-- Create tracers for new players
+game.Players.PlayerAdded:Connect(function(player)
+    if player ~= lplr then
+        createTracerForPlayer(player)
+    end
+end)
 
 -- End of Esp Tracers
 
@@ -3721,6 +4052,60 @@ end)
 -- Add Keybind functionality for the ESP toggle
 local EspDistanceKeybind = EspDistanceToggle:AddKeybind()
 
+local lplr = game.Players.LocalPlayer
+local camera = game:GetService("Workspace").CurrentCamera
+
+_G.TeamCheck = false -- Toggle TeamCheck to True or False
+
+-- Function to create a distance label
+local function CreateDistanceLabel()
+    local DistanceLabel = Drawing.new("Text")
+    DistanceLabel.Color = Color3.new(1, 1, 1)
+    DistanceLabel.Size = 14
+    DistanceLabel.Transparency = 1
+    DistanceLabel.Visible = false
+    return DistanceLabel
+end
+
+-- Function to update distance label
+local function UpdateDistanceLabel(v, DistanceLabel)
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if v.Character and v.Character:FindFirstChild("Humanoid") and v.Character:FindFirstChild("HumanoidRootPart") and v ~= lplr and v.Character.Humanoid.Health > 0 then
+            local distance = (lplr.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).magnitude
+            local Vector, onScreen = camera:worldToViewportPoint(v.Character.HumanoidRootPart.Position)
+
+            if onScreen then
+                DistanceLabel.Text = string.format("%.0f studs", distance)
+                DistanceLabel.Position = Vector2.new(Vector.X, Vector.Y - 20) -- Adjust position above the player
+                DistanceLabel.Visible = true
+
+                if v.TeamColor == lplr.TeamColor and _G.TeamCheck then
+                    DistanceLabel.Visible = false
+                end
+            else
+                DistanceLabel.Visible = false
+            end
+        else
+            DistanceLabel.Visible = false
+        end
+    end)
+end
+
+-- Create distance labels for existing players
+for _, v in pairs(game.Players:GetPlayers()) do
+    if v ~= lplr then
+        local DistanceLabel = CreateDistanceLabel()
+        coroutine.wrap(function() UpdateDistanceLabel(v, DistanceLabel) end)()
+    end
+end
+
+-- Handle new players
+game.Players.PlayerAdded:Connect(function(v)
+    if v ~= lplr then
+        local DistanceLabel = CreateDistanceLabel()
+        coroutine.wrap(function() UpdateDistanceLabel(v, DistanceLabel) end)()
+    end
+end)
 
 -- End of Esp Distance
 
@@ -3733,5 +4118,277 @@ end)
 -- Add Keybind functionality for the ESP toggle
 local EspSkeletonsKeybind = EspSkeletonsToggle:AddKeybind()
 
+local Player = game:GetService("Players").LocalPlayer
+local Mouse = Player:GetMouse()
+local Camera = game:GetService("Workspace").CurrentCamera
+
+local function DrawLine()
+    local l = Drawing.new("Line")
+    l.Visible = false
+    l.From = Vector2.new(0, 0)
+    l.To = Vector2.new(1, 1)
+    l.Color = Color3.fromRGB(255, 0, 0)
+    l.Thickness = 1
+    l.Transparency = 1
+    return l
+end
+
+local function DrawESP(plr)
+    repeat wait() until plr.Character ~= nil and plr.Character:FindFirstChild("Humanoid") ~= nil
+    local limbs = {}
+    local R15 = (plr.Character.Humanoid.RigType == Enum.HumanoidRigType.R15) and true or false
+    if R15 then 
+        limbs = {
+            -- Spine
+            Head_UpperTorso = DrawLine(),
+            UpperTorso_LowerTorso = DrawLine(),
+            -- Left Arm
+            UpperTorso_LeftUpperArm = DrawLine(),
+            LeftUpperArm_LeftLowerArm = DrawLine(),
+            LeftLowerArm_LeftHand = DrawLine(),
+            -- Right Arm
+            UpperTorso_RightUpperArm = DrawLine(),
+            RightUpperArm_RightLowerArm = DrawLine(),
+            RightLowerArm_RightHand = DrawLine(),
+            -- Left Leg
+            LowerTorso_LeftUpperLeg = DrawLine(),
+            LeftUpperLeg_LeftLowerLeg = DrawLine(),
+            LeftLowerLeg_LeftFoot = DrawLine(),
+            -- Right Leg
+            LowerTorso_RightUpperLeg = DrawLine(),
+            RightUpperLeg_RightLowerLeg = DrawLine(),
+            RightLowerLeg_RightFoot = DrawLine(),
+        }
+    else 
+        limbs = {
+            Head_Spine = DrawLine(),
+            Spine = DrawLine(),
+            LeftArm = DrawLine(),
+            LeftArm_UpperTorso = DrawLine(),
+            RightArm = DrawLine(),
+            RightArm_UpperTorso = DrawLine(),
+            LeftLeg = DrawLine(),
+            LeftLeg_LowerTorso = DrawLine(),
+            RightLeg = DrawLine(),
+            RightLeg_LowerTorso = DrawLine()
+        }
+    end
+    local function Visibility(state)
+        for i, v in pairs(limbs) do
+            v.Visible = state
+        end
+    end
+
+    local function Colorize(color)
+        for i, v in pairs(limbs) do
+            v.Color = color
+        end
+    end
+
+    local function UpdaterR15()
+        local connection
+        connection = game:GetService("RunService").RenderStepped:Connect(function()
+            if plr.Character ~= nil and plr.Character:FindFirstChild("Humanoid") ~= nil and plr.Character:FindFirstChild("HumanoidRootPart") ~= nil and plr.Character.Humanoid.Health > 0 then
+                local HUM, vis = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+                if vis then
+                    -- Head
+                    local H = Camera:WorldToViewportPoint(plr.Character.Head.Position)
+                    if limbs.Head_UpperTorso.From ~= Vector2.new(H.X, H.Y) then
+                        --Spine
+                        local UT = Camera:WorldToViewportPoint(plr.Character.UpperTorso.Position)
+                        local LT = Camera:WorldToViewportPoint(plr.Character.LowerTorso.Position)
+                        -- Left Arm
+                        local LUA = Camera:WorldToViewportPoint(plr.Character.LeftUpperArm.Position)
+                        local LLA = Camera:WorldToViewportPoint(plr.Character.LeftLowerArm.Position)
+                        local LH = Camera:WorldToViewportPoint(plr.Character.LeftHand.Position)
+                        -- Right Arm
+                        local RUA = Camera:WorldToViewportPoint(plr.Character.RightUpperArm.Position)
+                        local RLA = Camera:WorldToViewportPoint(plr.Character.RightLowerArm.Position)
+                        local RH = Camera:WorldToViewportPoint(plr.Character.RightHand.Position)
+                        -- Left leg
+                        local LUL = Camera:WorldToViewportPoint(plr.Character.LeftUpperLeg.Position)
+                        local LLL = Camera:WorldToViewportPoint(plr.Character.LeftLowerLeg.Position)
+                        local LF = Camera:WorldToViewportPoint(plr.Character.LeftFoot.Position)
+                        -- Right leg
+                        local RUL = Camera:WorldToViewportPoint(plr.Character.RightUpperLeg.Position)
+                        local RLL = Camera:WorldToViewportPoint(plr.Character.RightLowerLeg.Position)
+                        local RF = Camera:WorldToViewportPoint(plr.Character.RightFoot.Position)
+
+                        --Head
+                        limbs.Head_UpperTorso.From = Vector2.new(H.X, H.Y)
+                        limbs.Head_UpperTorso.To = Vector2.new(UT.X, UT.Y)
+
+                        --Spine
+                        limbs.UpperTorso_LowerTorso.From = Vector2.new(UT.X, UT.Y)
+                        limbs.UpperTorso_LowerTorso.To = Vector2.new(LT.X, LT.Y)
+
+                        -- Left Arm
+                        limbs.UpperTorso_LeftUpperArm.From = Vector2.new(UT.X, UT.Y)
+                        limbs.UpperTorso_LeftUpperArm.To = Vector2.new(LUA.X, LUA.Y)
+
+                        limbs.LeftUpperArm_LeftLowerArm.From = Vector2.new(LUA.X, LUA.Y)
+                        limbs.LeftUpperArm_LeftLowerArm.To = Vector2.new(LLA.X, LLA.Y)
+
+                        limbs.LeftLowerArm_LeftHand.From = Vector2.new(LLA.X, LLA.Y)
+                        limbs.LeftLowerArm_LeftHand.To = Vector2.new(LH.X, LH.Y)
+
+                        -- Right Arm
+                        limbs.UpperTorso_RightUpperArm.From = Vector2.new(UT.X, UT.Y)
+                        limbs.UpperTorso_RightUpperArm.To = Vector2.new(RUA.X, RUA.Y)
+
+                        limbs.RightUpperArm_RightLowerArm.From = Vector2.new(RUA.X, RUA.Y)
+                        limbs.RightUpperArm_RightLowerArm.To = Vector2.new(RLA.X, RLA.Y)
+
+                        limbs.RightLowerArm_RightHand.From = Vector2.new(RLA.X, RLA.Y)
+                        limbs.RightLowerArm_RightHand.To = Vector2.new(RH.X, RH.Y)
+
+                        -- Left Leg
+                        limbs.LowerTorso_LeftUpperLeg.From = Vector2.new(LT.X, LT.Y)
+                        limbs.LowerTorso_LeftUpperLeg.To = Vector2.new(LUL.X, LUL.Y)
+
+                        limbs.LeftUpperLeg_LeftLowerLeg.From = Vector2.new(LUL.X, LUL.Y)
+                        limbs.LeftUpperLeg_LeftLowerLeg.To = Vector2.new(LLL.X, LLL.Y)
+
+                        limbs.LeftLowerLeg_LeftFoot.From = Vector2.new(LLL.X, LLL.Y)
+                        limbs.LeftLowerLeg_LeftFoot.To = Vector2.new(LF.X, LF.Y)
+
+                        -- Right Leg
+                        limbs.LowerTorso_RightUpperLeg.From = Vector2.new(LT.X, LT.Y)
+                        limbs.LowerTorso_RightUpperLeg.To = Vector2.new(RUL.X, RUL.Y)
+
+                        limbs.RightUpperLeg_RightLowerLeg.From = Vector2.new(RUL.X, RUL.Y)
+                        limbs.RightUpperLeg_RightLowerLeg.To = Vector2.new(RLL.X, RLL.Y)
+
+                        limbs.RightLowerLeg_RightFoot.From = Vector2.new(RLL.X, RLL.Y)
+                        limbs.RightLowerLeg_RightFoot.To = Vector2.new(RF.X, RF.Y)
+                    end
+
+                    if limbs.Head_UpperTorso.Visible ~= true then
+                        Visibility(true)
+                    end
+                else 
+                    if limbs.Head_UpperTorso.Visible ~= false then
+                        Visibility(false)
+                    end
+                end
+            else 
+                if limbs.Head_UpperTorso.Visible ~= false then
+                    Visibility(false)
+                end
+                if game.Players:FindFirstChild(plr.Name) == nil then 
+                    for i, v in pairs(limbs) do
+                        v:Remove()
+                    end
+                    connection:Disconnect()
+                end
+            end
+        end)
+    end
+
+    local function UpdaterR6()
+        local connection
+        connection = game:GetService("RunService").RenderStepped:Connect(function()
+            if plr.Character ~= nil and plr.Character:FindFirstChild("Humanoid") ~= nil and plr.Character:FindFirstChild("HumanoidRootPart") ~= nil and plr.Character.Humanoid.Health > 0 then
+                local HUM, vis = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+                if vis then
+                    local H = Camera:WorldToViewportPoint(plr.Character.Head.Position)
+                    if limbs.Head_Spine.From ~= Vector2.new(H.X, H.Y) then
+                        local T_Height = plr.Character.Torso.Size.Y/2 - 0.2
+                        local UT = Camera:WorldToViewportPoint((plr.Character.Torso.CFrame * CFrame.new(0, T_Height, 0)).p)
+                        local LT = Camera:WorldToViewportPoint((plr.Character.Torso.CFrame * CFrame.new(0, -T_Height, 0)).p)
+
+                        local LA_Height = plr.Character["Left Arm"].Size.Y/2 - 0.2
+                        local LUA = Camera:WorldToViewportPoint((plr.Character["Left Arm"].CFrame * CFrame.new(0, LA_Height, 0)).p)
+                        local LLA = Camera:WorldToViewportPoint((plr.Character["Left Arm"].CFrame * CFrame.new(0, -LA_Height, 0)).p)
+
+                        local RA_Height = plr.Character["Right Arm"].Size.Y/2 - 0.2
+                        local RUA = Camera:WorldToViewportPoint((plr.Character["Right Arm"].CFrame * CFrame.new(0, RA_Height, 0)).p)
+                        local RLA = Camera:WorldToViewportPoint((plr.Character["Right Arm"].CFrame * CFrame.new(0, -RA_Height, 0)).p)
+
+                        local LL_Height = plr.Character["Left Leg"].Size.Y/2 - 0.2
+                        local LUL = Camera:WorldToViewportPoint((plr.Character["Left Leg"].CFrame * CFrame.new(0, LL_Height, 0)).p)
+                        local LLL = Camera:WorldToViewportPoint((plr.Character["Left Leg"].CFrame * CFrame.new(0, -LL_Height, 0)).p)
+
+                        local RL_Height = plr.Character["Right Leg"].Size.Y/2 - 0.2
+                        local RUL = Camera:WorldToViewportPoint((plr.Character["Right Leg"].CFrame * CFrame.new(0, RL_Height, 0)).p)
+                        local RLL = Camera:WorldToViewportPoint((plr.Character["Right Leg"].CFrame * CFrame.new(0, -RL_Height, 0)).p)
+
+                        -- Head
+                        limbs.Head_Spine.From = Vector2.new(H.X, H.Y)
+                        limbs.Head_Spine.To = Vector2.new(UT.X, UT.Y)
+
+                        --Spine
+                        limbs.Spine.From = Vector2.new(UT.X, UT.Y)
+                        limbs.Spine.To = Vector2.new(LT.X, LT.Y)
+
+                        --Left Arm
+                        limbs.LeftArm.From = Vector2.new(LUA.X, LUA.Y)
+                        limbs.LeftArm.To = Vector2.new(LLA.X, LLA.Y)
+
+                        limbs.LeftArm_UpperTorso.From = Vector2.new(UT.X, UT.Y)
+                        limbs.LeftArm_UpperTorso.To = Vector2.new(LUA.X, LUA.Y)
+
+                        --Right Arm
+                        limbs.RightArm.From = Vector2.new(RUA.X, RUA.Y)
+                        limbs.RightArm.To = Vector2.new(RLA.X, RLA.Y)
+
+                        limbs.RightArm_UpperTorso.From = Vector2.new(UT.X, UT.Y)
+                        limbs.RightArm_UpperTorso.To = Vector2.new(RUA.X, RUA.Y)
+
+                        --Left Leg
+                        limbs.LeftLeg.From = Vector2.new(LUL.X, LUL.Y)
+                        limbs.LeftLeg.To = Vector2.new(LLL.X, LLL.Y)
+
+                        limbs.LeftLeg_LowerTorso.From = Vector2.new(LT.X, LT.Y)
+                        limbs.LeftLeg_LowerTorso.To = Vector2.new(LUL.X, LUL.Y)
+
+                        --Right Leg
+                        limbs.RightLeg.From = Vector2.new(RUL.X, RUL.Y)
+                        limbs.RightLeg.To = Vector2.new(RLL.X, RLL.Y)
+
+                        limbs.RightLeg_LowerTorso.From = Vector2.new(LT.X, LT.Y)
+                        limbs.RightLeg_LowerTorso.To = Vector2.new(RUL.X, RUL.Y)
+                    end
+
+                    if limbs.Head_Spine.Visible ~= true then
+                        Visibility(true)
+                    end
+                else 
+                    if limbs.Head_Spine.Visible ~= false then
+                        Visibility(false)
+                    end
+                end
+            else 
+                if limbs.Head_Spine.Visible ~= false then
+                    Visibility(false)
+                end
+                if game.Players:FindFirstChild(plr.Name) == nil then 
+                    for i, v in pairs(limbs) do
+                        v:Remove()
+                    end
+                    connection:Disconnect()
+                end
+            end
+        end)
+    end
+
+    if R15 then
+        coroutine.wrap(UpdaterR15)()
+    else 
+        coroutine.wrap(UpdaterR6)()
+    end
+end
+
+for i, v in pairs(game:GetService("Players"):GetPlayers()) do
+    if v.Name ~= Player.Name then
+        DrawESP(v)
+    end
+end
+
+game.Players.PlayerAdded:Connect(function(newplr)
+    if newplr.Name ~= Player.Name then
+        DrawESP(newplr)
+    end
+end)
 
 -- End of Esp Skeletons
