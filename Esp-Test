@@ -3657,9 +3657,8 @@ end
 -- GUI Setup
 local NotifyLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/Kinlei/Dynissimo/main/Scripts/AkaliNotif.lua"))()
 local Notify = NotifyLibrary.Notify
-local Window = library:CreateWindow("MoonWalker - Arsenal", Vector2.new(492, 592), Enum.KeyCode.RightShift)
+local Window = library:CreateWindow("Azure Modded Esp Test - Mamelok", Vector2.new(492, 592), Enum.KeyCode.RightShift)
 
-local AimingTab = Window:CreateTab("Aimlocks")
-local PlayerTab = Window:CreateTab("Player")
-local TogglesTab = Window:CreateTab("Toggles")
 local VisualsTab = Window:CreateTab("Visuals")
+
+local VisualsSection = VisualsTab:CreateSector("Esp", "left")
